@@ -1,0 +1,171 @@
+<html>
+<body style='background-color:black'>
+<canvas id='canvas' width='800' height='800'></canvas>
+<script>
+  /*********************************************************************
+   * Constants. Adjust these to see different speeds and effects.
+   *********************************************************************/
+  // The total length of the rocket with tail.
+  const TAIL_LENGTH = 15; // Default 15.
+
+  // The length of a single piece of the explosion.
+  const SPARK_LENGTH = 10; // Default 10.
+
+  // Number of "pieces" the rocket explodes into.
+  const MAX_SPARKS = 50; // Default 50.
+
+  // Margin of top and bottom that a rocket should not explode in (px).
+  const MAX_HEIGHT = 100; // Default 100.
+
+  const ROCKET_SPEED = 10; // Default 10.
+
+  // How often should a new firework be added. Must be between 0 and 1.
+  // 0.05 creates a natural clustering and will rarely reach the max. Assuming canvas height is 800.
+  const FIREWORK_FREQUENCY = 0.05;
+  const MAX_FIREWORKS = 10;
+
+  /*********************************************************************
+   * Objects. Each represents a single rendered entity.
+   *********************************************************************/
+
+  // A firework object.
+  function Firework()
+  {
+    this.x = Math.floor(Math.random() * canvas.width);
+    this.y = canvas.height;
+
+    // TODO: weight this to explode higher.
+    this.explode_y = Math.max(Math.ceil(Math.random() * canvas.height - MAX_HEIGHT), MAX_HEIGHT);
+    this.age = 0;
+    this.phase = 'fly';
+    this.sparks = [];
+
+    for (let n = 0; n < MAX_SPARKS; n++)
+    {
+      this.sparks.push(new Spark());
+    }
+  }
+
+  // Spark object.
+  function Spark()
+  {
+    // Randomize color and position.
+    this.x = Math.random() * 5 + .5;
+    this.y = Math.random() * 5 + .5;
+    this.weight = Math.random() * .3 + .03;
+    this.red = Math.floor(Math.random() * 2);
+    this.green = Math.floor(Math.random() * 2);
+    this.blue = Math.floor(Math.random() * 2);
+
+    if (Math.random() > .5)
+    {
+      this.x = -this.x;
+    }
+    if (Math.random() > .5)
+    {
+      this.y = -this.y;
+    }
+  }
+
+  /*********************************************************************
+   * Program.
+   *********************************************************************/
+
+  var canvas = document.getElementById('canvas');
+  var context = canvas.getContext('2d');
+  var fireworks = [];
+
+  // Initialize the system with one rocket so their is something to see.
+  fireworks.push(new Firework());
+
+  // Main program loop. Each loop of this is one frame in the video.
+  function frame()
+  {
+    // Clear the frame before drawing the updated objects.
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update every firework in the array. The array is treated as a line or "queue". When someone is finished
+    // with their turn they are returned to the back of the line.
+    for(let i = 0; i < fireworks.length; i++)
+    {
+      // Pull a firework off the bottom.
+      var firework = fireworks.shift();
+
+      // The explode stage renders the sparks.
+      if (firework.phase == 'explode')
+      {
+        // Go through each spark and create it's trail.
+        for (let j = 0; j < firework.sparks.length; j++)
+        {
+          let spark = firework.sparks.shift();
+          for (let k = 0; k < SPARK_LENGTH; k++)
+          {
+            let trailAge = firework.age + k;
+            let x = firework.x + spark.x * trailAge;
+            let y = firework.y + spark.y * trailAge + spark.weight * trailAge * spark.weight * trailAge;
+            let fade = k * 20 - firework.age * 2;
+            let r = Math.floor(spark.red * fade);
+            let g = Math.floor(spark.green * fade);
+            let b = Math.floor(spark.blue * fade);
+            context.beginPath();
+            context.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',1)';
+            context.rect(x, y, 4, 4);
+            context.fill();
+          }
+          firework.sparks.push(spark);
+        }
+        firework.age++;
+
+        if (firework.age <= 100)
+        {
+          // Put the firework back on top.
+          fireworks.push(firework);
+        }
+        // else clean-up. Javascript's Garbage collection will remove the dangling object when firework is overwritten
+        // with the new object and no more variables reference it.
+      }
+      // The rocket rising from the ground.
+      else if (firework.phase == 'fly')
+      {
+        // Move the rocket "up" at a constant speed.
+        firework.y = firework.y - ROCKET_SPEED;
+
+        // Create the rocket. The rocket is a series of 4x4 "pixels" waving randomly back and forth.
+        // Fade from red to green accross the length to give the effect of a tail.
+        for (let tail = 0; tail < TAIL_LENGTH; tail++)
+        {
+          context.beginPath();
+
+          // Fade from red (50) to green (tail * 17).
+          context.fillStyle = 'rgba(' + 50 + ',' + tail * 17 + ',0,1)';
+          context.rect(firework.x + Math.random() * tail - tail / 2, firework.y + tail * 4, 4, 4);
+          context.fill();
+        }
+
+        // When the firework reaches the randomly generated y position change states.
+        if (firework.y < firework.explode_y)
+        {
+          firework.phase = 'explode';
+        }
+        fireworks.push(firework);
+      }
+      else
+      {
+        // This should never be reached. If it is the system should heal itself as the firework in question will not
+        // be placed back in queue.
+      }
+    }
+
+    if (fireworks.length < MAX_FIREWORKS && Math.random() < FIREWORK_FREQUENCY)
+    {
+      fireworks.push(new Firework());
+    }
+    window.requestAnimationFrame(frame);
+  }
+
+  // Trigger the first frame which will repeat itself.
+  window.requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
